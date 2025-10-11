@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const user = {
+const user = mongoose.Schema({
     name:{
         type : String,
         required :true
@@ -16,8 +16,14 @@ const user = {
     pass:{
         type : String,
         required :true
+    },
+    interest:{
+        type :Array,
+        required:true
     }
-}
+},{
+    timestamps:true  
+})
 
 
 const userModal = mongoose.model('user',user )

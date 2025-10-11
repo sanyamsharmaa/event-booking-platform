@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt'
-import { userModal } from '../modals/user.js'
+import { userModal } from '../modals/userModal.js'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
 
