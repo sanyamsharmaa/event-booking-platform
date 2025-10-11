@@ -16,15 +16,15 @@ const schema = new mongoose.Schema({
     }],
     passTypes:[{
         tier: String, //object that having keys as type and value for price
+        price : Number,
         tktCount:Number
     }],
     img:{
         type:String,
         required:true
     },
-    artists:[{
-        artist : String
-    }],
+    artists:[  String
+    ],
     desp:{
         type: String,
         required:true

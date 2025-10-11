@@ -45,16 +45,16 @@ export const addEvent = async (req, res) => {
             
         }
         const obj = {
-            name,
-            category,
-            details,
-            passTypes,
-            img,
-            artists,
-            desp
+            name:name,
+            category : category,
+            details: dObj,
+            passTypes: passTypes,
+            img: img,
+            artists: artists,
+            desp : desp
         }
         await eventModal.create(obj)
-        res.status(400).json({status:true, msg:"Event listed successfully"})
+        res.status(200).json({status:true, msg:"Event listed successfully"})
 
     }
     catch (err) {
