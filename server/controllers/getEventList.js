@@ -11,28 +11,38 @@ export const getEventList = async (req, res) => {
             search = "",
         } = req.body
 
-
-
         if (!location || !category) {
             res.status(404).json({ success: true, msg: "All fields are required" })
         }
         let filter = {}
-        if (date != "") {
-            let startDate, endDate;
+        if(date == ""){
             const today = DateTime.now();
-            if (date !== "") {
-                startDate = new Date(today.startOf(date).toISO()),
-                    endDate = new Date(today.endOf(date).toISO())  // date must be either  'week', 'month'
-                console.log("start and end date-", startDate, endDate, typeof(startDate))
-                // filter['details.date'] = { $gte: startDate, $lte: endDate }
-                // This ensures that a SINGLE element in the details array matches the entire date range.
-                filter.details = {
-                    $elemMatch: {
-                        date: { $gte: startDate, $lte: endDate }
-                    }
-                };
-            }
+            let startDate;
+            startDate = new Date(today.startOf(date).toISO());
+            filter.details = {
+                $elemMatch: {
+                    date: { $gte: startDate}
+                }
+            };
+            
         }
+
+        if (date != "") {
+            const selectedDate = DateTime.fromFormat(date, "DD-MM-YYYY").toISO();
+            let startDate, endDate;
+            startDate = new Date(selectedDate.startOf(date).toISO())
+            endDate = new Date(selectedDate.endOf(date).toISO())  // date must be either  'week', 'month'
+            console.log("start and end date-", startDate, endDate, typeof(startDate))
+            // filter['details.date'] = { $gte: startDate, $lte: endDate }
+            // This ensures that a SINGLE element in the details array matches the entire date range.
+            filter.details = {
+                $elemMatch: {
+                    date: { $gte: startDate, $lte: endDate }
+                }
+            };
+            
+        }
+
         if (category !== 'All') {
             // filter.category = { $in: ['movies', 'concerts', 'sports', 'comedy', 'workshops'] }
             filter.category = { $eq: category }

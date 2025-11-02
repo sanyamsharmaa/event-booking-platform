@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import userRoutes from './routes/routes.js'
 import cookieParser from 'cookie-parser'
+import { authZmiddleware } from './middlewares/authZ.middleware.js'
 
 
 // import routes from './routes'
@@ -15,7 +16,7 @@ const app = express();
 app.use(cors());
 app.use(cookieParser())
 app.use(express.json())
-app.use('/', userRoutes)
+app.use('/',authZmiddleware,  userRoutes)
 
 
 // app.get('/register', registerUser);
