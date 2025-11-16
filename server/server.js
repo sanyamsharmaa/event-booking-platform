@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import 'dotenv/config'
 import userRoutes from './routes/routes.js'
 import cookieParser from 'cookie-parser'
 import { authZmiddleware } from './middlewares/authZ.middleware.js'

@@ -23,15 +23,17 @@ const schema = new mongoose.Schema({
         type:String,
         required:true
     },
-    artists:[  String
-    ],
+    artists:{
+        type : [String],
+        required:true
+    },
     desp:{
         type: String,
         required:true
     },
 },
-    {timestamps:true
-
+    {
+        timestamps:true
     })
 
 

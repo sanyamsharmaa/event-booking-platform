@@ -18,8 +18,9 @@ export const getEventList = async (req, res) => {
         if(date == ""){
             const today = DateTime.now();
             let startDate;
-            startDate = new Date(today.startOf(date).toISO());
-            filter.details = {
+            // startDate = new Date(today.startOf("date").toISO());
+            startDate = DateTime.now().startOf("day");
+            filter.details = {  //may not give correct result as details is an array not having single object, should be handle like - return the event if event single object has date > today's date
                 $elemMatch: {
                     date: { $gte: startDate}
                 }

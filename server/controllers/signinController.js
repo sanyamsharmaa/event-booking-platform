@@ -50,8 +50,8 @@ export const signinController = async (req, res) => {
 
             const secretKey = process.env.JWT_SECRET_KEY
             const payload = {
-                id: user.id,
-                name: user.name,
+                id: holder.id,
+                name: holder.name,
                 role,
                 
             }
@@ -65,7 +65,13 @@ export const signinController = async (req, res) => {
                 maxAge: 6.048e+8
             })
 
-            res.status(200).json({ status: true, msg: "user logged in successfully" })
+            console.log("Signing in...")
+            res.status(200).json({ 
+                status: true,
+                token:token,
+                msg: "user logged in successfully"
+             })
+
             res.redirect('/home');
 
         }

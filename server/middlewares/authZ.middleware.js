@@ -1,10 +1,10 @@
 import jwt, { decode } from 'jsonwebtoken'
-import { userModal } from '../modals/userModal'
-import { artistModal } from '../modals/artistModal'
+// import { userModal } from '../modals/userModal'
+// import { artistModal } from '../modals/artistModal'
 
 export const authZmiddleware = async (req, res, next) => {
     try {
-        console.log("REQQ-", req)
+        // console.log("REQQ-", req)
         const token = req.unique_jwt_key || req.cookies.token || req.headers.unique_jwt_key || ''
         if (!token) {
             if (req.path == '/signin' || req.path == '/register') {
@@ -21,21 +21,30 @@ export const authZmiddleware = async (req, res, next) => {
                     res.status(400).json({ success: false, msg: `verification error - ${err}` })
                     return
                 }
+                console.log("decoded-", decoded)
 
-                console.log("yr user-", decoded)
+                req.user = {
+                    id: decoded.id,
+                    name: decoded.name,
+                    role: decoded.role
+                }
                 // req.user = decoded;
-                if (req.path.includes[
-                    "/get-events"
+                console.log("path-", req.path)
+                // if (req.path.includes[
+                //     "/get-events"
 
-                ]) {  // decoded.role == "user" ||
+                // ]) 
+                 if (req.path=="/get-events")
+                {  // decoded.role == "user" ||
                     next()
                     return
                 }
-                else if (req.path.includes[
-                    "add-event"
-                ]) {
-                    if( decoded.role != "artist"){
-                        res.status(401).json({success:false, msg:"you don't have permssion to add event"})
+                // else if (req.path.includes[
+                //     "/add-event"
+                // ])
+                else if (req.path =="/add-event") {
+                    if (decoded.role != "artist") {
+                        res.status(401).json({ success: false, msg: "you don't have permssion to add event" })
                     }
                     next()
                     return
@@ -47,18 +56,15 @@ export const authZmiddleware = async (req, res, next) => {
                 //     role = 'artist'
                 // }
 
-                req.user = {
-                    id: decoded.id,
-                    name: account.name,
-                    role: role
-                }
-                console.log("userwa-", req.user)
-                if (!holder) {
-                    res.status(400).json({ success: false, msg: "no holder found" })
-                }
+                // console.log("userwa-", req.user)
+                // if (!holder) {
+                //     res.status(400).json({ success: false, msg: "no holder found" })
+                // }
 
 
-                res.status(200).json({ success: true, msg: "aaj k liye itna hi" })
+                // res.status(200).json({ success: true, msg: "aaj k liye itna hi" }).
+                 next()
+                    return
 
             })
 
