@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt"
-import { userModal } from "../modals/user.js"
+import { userModal } from "../modals/userModal.js"
+import { artistModal } from "../modals/artistModal.js";
 
 
 async function  encryptPass(pass){
@@ -22,12 +23,18 @@ export  const registerController = async(req, res) => {
             name,
             mobile,
             mail,
-            pass
+            pass,
+            role,
+            interestArr,
+            headline,
+            
     } = req?.body
     
-    if(!name || !mobile || !mail || !pass){
+    if(!name || !mobile || !mail || !pass || !role ){
         res.status(400).json({success : false, msg:"All fields required"})
     }
+    
+    if(role=='user'){
     const exist1 = await userModal.find({mobile:mobile});
     const exist2 = await userModal.find({mail:mail});
     // console.log("exist", exist)
@@ -38,17 +45,49 @@ export  const registerController = async(req, res) => {
     if(exist2.length){
         res.status(400).json({success:false, msg:"the mail  is already used!"});
     }
-    const encPass = await encryptPass(pass)
-    console.log("encPass", encPass)
-    const obj = {
-        name:name,
-        mobile:mobile,
-        mail:mail,
-        pass:encPass
+    if(!interestArr ){
+        res.status(400).json({success : false, msg:"Interest array required"})
     }
-    userModal.create(obj)
+    const encPass = await encryptPass(pass)
+    // console.log("encPass", encPass)
+        const obj = {
+            name:name,
+            mobile:mobile,
+            mail:mail,
+            pass:encPass,
+            interest :interestArr
+        }
 
-    res.status(200).json({msg:"user successfully created!"})
+        userModal.create(obj)
+    }
+    else if(role=='artist'){
+        const exist1 = await artistModal.find({mobile:mobile});
+        const exist2 = await artistModal.find({mail:mail});
+    // console.log("exist", exist)
+
+    if(exist1.length){
+        res.status(400).json({success:false, msg:"the mobile number is already used!"});
+    }
+    if(exist2.length){
+        res.status(400).json({success:false, msg:"the mail  is already used!"});
+    }
+        if(!headline ){
+        res.status(400).json({success : false, msg:"headline is required"})
+    }
+    const encPass = await encryptPass(pass)
+    // console.log("encPass", encPass)
+        const obj = {
+            name:name,
+            mobile:mobile,
+            mail:mail,
+            pass:encPass,
+            headline:headline
+        }
+
+        artistModal.create(obj)
+    }
+
+    res.status(200).json({msg:"account successfully created!"})
 }
 catch(err){
     res.status(500).json({msg:err})
