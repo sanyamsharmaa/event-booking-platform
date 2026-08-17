@@ -4,10 +4,10 @@ import jwt, { decode } from 'jsonwebtoken'
 
 export const authZmiddleware = async (req, res, next) => {
     try {
-        // console.log("REQQ-", req)
+        console.log("REQQ-", req.path, req.method)
         const token = req.unique_jwt_key || req.cookies.token || req.headers.unique_jwt_key || ''
         if (!token) {
-            if (req.path == '/signin' || req.path == '/register') {
+            if (req.path == '/signin' || req.path == '/register' || req.path=="/create-order" ||  req.path=='/verify-payment') { //payment route to be remove 
                 next()
                 return;
             }

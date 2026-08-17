@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Razorpay Payment</title>
+</head>
+
+<body>
+    <h1>Yo Yo Honey Singh:My Story</h1>
+    <form id="payment-form">
+        <div>
+            <label for="fruits">Choose a Pass Type:</label>
+            <select id="tier" name="tier" required>
+            <option value="General">General - 1500</option>
+            <option value="Gold">Gold - 2500</option>
+            <option value="Elite">Elite - 4000</option>
+        </select>
+        </div>
+         <div>
+             <label for="amount">Amount:</label>
+             <input type="number" id="amount" name="amount" required>
+        </div>
+        <div>
+            <label for="tickets">how many tickets you want:</label>
+            <select id="ticket" name="ticket">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+        <button type="button" onclick="payNow()">Pay Now</button>
+    </form>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script>
+        async function payNow() {
+            const price = document.getElementById('amount').value;
+            const passType = document.getElementById('tier').value;
+            const tkts= document.getElementById('ticket').value;
+            const amount = price * tkts;
+            const eventId = "8818";
+            const userId = "6969"
+
+            // Create order by calling the server endpoint
+            const response = await fetch('http://localhost:8000/create-order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ amount, currency: 'INR', receipt: 'receipt#1', notes: {}, eventId, passType, userId, tkts })
+            });
+
+            const order = await response.json();
+            console.log("order-", order);
+            // Open Razorpay Checkout
+            const options = {
+                key: "rzp_test_S8aRTZcnQ447ir", // Replace with your Razorpay key_id
+                amount: order.order.amount, // Amount is in currency subunits.
+                currency: order.order.currency,
+                name: 'Acme Corp',
+                description: 'Test Transaction',
+                order_id: order.order.id,
+                // callback_url: 'http://localhost:8000/payment-success', // Your success URL
+                handler: function (response) {
+                    fetch('http://localhost:8000/verify-payment', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature
+                        })
+                    }).then(res => res.json())
+                        .then(async(data) => {
+                            if (data.success === true) {
+                                // window.location.href = '/payment-success';
+                                //after successful payment fire book-event api..
+                                try{
+                                    const response = await fetch('http://localhost:8000/book-event', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({eventId, passType, userId,tkts })
+                                    });
+                                }catch(err){
+                                    console.error('Error booking event:', err);
+                                }
+
+                            }
+                            else { alert('Payment verification failed'); }
+                        }).catch(error => {
+                            console.error('Error:', error); alert('Error verifying payment');
+                        });
+
+                },
+                prefill: {
+                    name: '<name>',
+                    email: '<email>',
+                    contact: '9999999999'
+                },
+                theme: {
+                    color: '#F37254'
+                },
+            };
+
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+    </script>
+</body>
+
+</html>

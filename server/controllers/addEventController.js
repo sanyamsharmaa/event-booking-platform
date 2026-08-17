@@ -1,5 +1,7 @@
 import { eventModal } from "../modals/eventModal.js"
 import {DateTime} from 'luxon'
+import {redis} from '../utils/redis.js'
+
 
 export const addEvent = async (req, res) => {
     try {
@@ -37,12 +39,20 @@ export const addEvent = async (req, res) => {
             res.status(400).json({status:false, msg:"artist array can't be empyty"})
 
         }
+        //setting available ticket count for each tier in passtypes
+        for (let i = 0; i < passTypes.length; i++) {
+            const type = passTypes[i];
+                    await redis.set(
+                      `event:${eventId}:tier:${type.tier}:available`,
+                       type.tktCount
+                      );
+        }
+
 
         const check = await eventModal.find({name:name});
-        console.log("check-", check)
+        console.log("check-", check.length, )
         if(check.length){
-            res.status(400).json({status:false, msg:"event of same name is already present, try something unique"})
-            
+           return res.status(400).json({status:false, msg:"event of same name is already present, try something unique"})
         }
         const obj = {
             name:name,
