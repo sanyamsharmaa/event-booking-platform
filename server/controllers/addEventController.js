@@ -1,7 +1,6 @@
-import { eventModal } from "../modals/eventModal.js"
-import {DateTime} from 'luxon'
-import {redis} from '../utils/redis.js'
-
+import { eventModal } from "../modals/eventModal.js";
+import { DateTime } from 'luxon';
+import { redis } from '../utils/redis.js';
 
 export const addEvent = async (req, res) => {
     try {
@@ -13,63 +12,65 @@ export const addEvent = async (req, res) => {
             img,
             artists,
             desp
-        } = req.body
-        console.log("body-", req.body)
+        } = req.body;
 
-        if(!name || !category || !details || !passTypes || !img || !artists || !desp){
-            res.status(400).json({status:false, msg:"fill all the fields"})
+        if (!name || !category || !details || !passTypes || !img || !artists || !desp) {
+            return res.status(400).json({ success: false, msg: "All fields are required" });
         }
 
-        if(details.length==0){
-            res.status(400).json({status:false, msg:"event details can't be empyty"})
-
-        }
-        const dObj = details.map(d=>({
-            city : d.city,
-            date :DateTime.fromFormat(d.date, 'dd-MM-yyyy', { zone: 'utc' }).toISO(),
-            venue: d.venue
-        }))
-        
-        if(Object.keys(passTypes).length==0){
-            res.status(400).json({status:false, msg:"pass type can't be empyty"})
-
+        if (!Array.isArray(details) || details.length === 0) {
+            return res.status(400).json({ success: false, msg: "Event details cannot be empty" });
         }
 
-        if(artists.length==0){
-            res.status(400).json({status:false, msg:"artist array can't be empyty"})
-
-        }
-        //setting available ticket count for each tier in passtypes
-        for (let i = 0; i < passTypes.length; i++) {
-            const type = passTypes[i];
-                    await redis.set(
-                      `event:${eventId}:tier:${type.tier}:available`,
-                       type.tktCount
-                      );
+        if (!Array.isArray(passTypes) || passTypes.length === 0) {
+            return res.status(400).json({ success: false, msg: "Pass types cannot be empty" });
         }
 
-
-        const check = await eventModal.find({name:name});
-        console.log("check-", check.length, )
-        if(check.length){
-           return res.status(400).json({status:false, msg:"event of same name is already present, try something unique"})
+        if (!Array.isArray(artists) || artists.length === 0) {
+            return res.status(400).json({ success: false, msg: "Artists array cannot be empty" });
         }
+
+        // Check if event with the same name already exists
+        const existingEvent = await eventModal.findOne({ name });
+        if (existingEvent) {
+            return res.status(400).json({ success: false, msg: "An event with the same name is already present, try something unique" });
+        }
+
+        // Format and validate dates safely
+        const dObj = details.map(d => {
+            const parsedDate = DateTime.fromFormat(d.date, 'dd-MM-yyyy', { zone: 'utc' });
+            return {
+                city: d.city,
+                date: parsedDate.isValid ? parsedDate.toJSDate() : new Date(d.date),
+                venue: d.venue
+            };
+        });
+
         const obj = {
-            name:name,
-            category : category,
+            name,
+            category,
             details: dObj,
-            passTypes: passTypes,
-            img: img,
-            artists: artists,
-            desp : desp
+            passTypes,
+            img,
+            artists,
+            desp
+        };
+
+        // Create the event in MongoDB first to get the generated event._id
+        const newEvent = await eventModal.create(obj);
+
+        // Store available ticket counts in Redis using the newly created event._id
+        for (const type of passTypes) {
+            await redis.set(
+                `event:${newEvent._id}:tier:${type.tier}:available`,
+                String(type.tktCount)
+            );
         }
-        await eventModal.create(obj)
-        res.status(200).json({status:true, msg:"Event listed successfully"})
 
-    }
-    catch (err) {
-        console.log(err)
-         res.status(500).json({status:false, msg:"internal server error"})
+        return res.status(200).json({ success: true, msg: "Event listed successfully", event: newEvent });
 
+    } catch (err) {
+        console.error("Error in addEvent:", err);
+        return res.status(500).json({ success: false, msg: "Internal server error" });
     }
-}
+};

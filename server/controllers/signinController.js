@@ -1,10 +1,10 @@
-import bcrypt from 'bcrypt'
-import { userModal } from '../modals/userModal.js'
-import {artistModal} from '../modals/artistModal.js'
-import jwt from 'jsonwebtoken'
-import dotenv from 'dotenv'
+import bcrypt from 'bcrypt';
+import { userModal } from '../modals/userModal.js';
+import { artistModal } from '../modals/artistModal.js';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
 
-dotenv.config()
+dotenv.config();
 
 export const signinController = async (req, res) => {
     try {
@@ -12,75 +12,61 @@ export const signinController = async (req, res) => {
             cred,
             pass,
             role
-        } = req?.body
-        // console.log('body', req.body)
-        // if(cred.length)
+        } = req?.body;
 
         if (!cred || !pass || !role) {
-            res.status(400).json({ status: false, msg: "All fields - cred, pass and role are required" })
+            return res.status(400).json({ success: false, msg: "All fields - cred, pass and role are required" });
         }
 
-        let resp, holder;
-
-        if (role == "user") {
-            let Umobile = await userModal.find({ mobile: cred })
-            let Umail = await userModal.find({ mail: cred })
-            if (!Umobile.length && !Umail.length) {
-                res.status(400).json({ status: false, msg: "No results found for these creadentails" })
-            }
-            holder = Umobile.length > 0 ? Umobile[0] : Umail[0]
-            // console.log("user", user[0])
-            // console.log("resp", resp)
-
+        if (role !== "user" && role !== "artist") {
+            return res.status(400).json({ success: false, msg: "Invalid role. Role must be 'user' or 'artist'" });
         }
-        else if (role == "artist") {
-            let Amobile = await artistModal.find({ mobile: cred })
-            let Amail = await artistModal.find({ mail: cred })
-            if (!Amobile.length && !Amail.length) {
-                res.status(400).json({ status: false, msg: "No results found for these creadentails" })
-            }
-            holder = Amobile.length > 0 ? Amobile[0] : Amail[0]
+
+        const model = role === "user" ? userModal : artistModal;
+        const holder = await model.findOne({
+            $or: [{ mobile: cred }, { mail: cred }]
+        });
+
+        if (!holder) {
+            return res.status(400).json({ success: false, msg: "No account found with these credentials" });
         }
-        // console.log('cred', Umail, Umobile)
 
-        
-        resp = bcrypt.compareSync(pass, holder.pass);
-        
-        if (resp) {
+        const isMatch = await bcrypt.compare(pass, holder.pass);
 
-            const secretKey = process.env.JWT_SECRET_KEY
-            const payload = {
-                id: holder.id,
+        if (!isMatch) {
+            return res.status(400).json({ success: false, msg: "Password didn't match, try again!" });
+        }
+
+        const secretKey = process.env.JWT_SECRET_KEY;
+        const payload = {
+            id: holder._id,
+            name: holder.name,
+            role
+        };
+
+        const token = jwt.sign(payload, secretKey, {
+            expiresIn: '7d'
+        });
+
+        res.cookie('token', token, {
+            httpOnly: true,
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            sameSite: 'lax'
+        });
+
+        return res.status(200).json({
+            success: true,
+            token,
+            user: {
+                id: holder._id,
                 name: holder.name,
-                role,
-                
-            }
+                role
+            },
+            msg: "User logged in successfully"
+        });
 
-            const token = jwt.sign(payload, secretKey, {
-                expiresIn: '7d'
-            })
-
-            res.cookie('token', token, {
-                httpOnly: true,
-                maxAge: 6.048e+8
-            })
-
-            console.log("Signing in...")
-            res.status(200).json({ 
-                status: true,
-                token:token,
-                msg: "user logged in successfully"
-             })
-
-            res.redirect('/home');
-
-        }
-        else {
-            res.status(400).json({ status: false, msg: "Password didn't matched, try again!" })
-        }
-
+    } catch (err) {
+        console.error("Error in signinController:", err);
+        return res.status(500).json({ success: false, msg: "Internal server error" });
     }
-    catch (err) {
-        res.status(500).json({ status: false, msg: `error is - ${err}` })
-    }
-}
+};

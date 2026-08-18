@@ -1,71 +1,60 @@
 import { eventModal } from "../modals/eventModal.js";
-import { DateTime } from 'luxon'
+import { DateTime } from 'luxon';
 
 export const getEventList = async (req, res) => {
-
     try {
         const {
-            location,
-            category,
+            location = "All",
+            category = "All",
             date = "",
             search = "",
-        } = req.body
+        } = req.body;
 
-        if (!location || !category) {
-            res.status(404).json({ success: true, msg: "All fields are required" })
-        }
-        let filter = {}
-        if(date == ""){
-            const today = DateTime.now();
-            let startDate;
-            // startDate = new Date(today.startOf("date").toISO());
-            startDate = DateTime.now().startOf("day");
-            filter.details = {  //may not give correct result as details is an array not having single object, should be handle like - return the event if event single object has date > today's date
-                $elemMatch: {
-                    date: { $gte: startDate}
-                }
-            };
-            
+        const filter = {};
+
+        // Category filter
+        if (category && category !== 'All') {
+            filter.category = category;
         }
 
-        if (date != "") {
-            const selectedDate = DateTime.fromFormat(date, "DD-MM-YYYY").toISO();
-            let startDate, endDate;
-            startDate = new Date(selectedDate.startOf(date).toISO())
-            endDate = new Date(selectedDate.endOf(date).toISO())  // date must be either  'week', 'month'
-            console.log("start and end date-", startDate, endDate, typeof(startDate))
-            // filter['details.date'] = { $gte: startDate, $lte: endDate }
-            // This ensures that a SINGLE element in the details array matches the entire date range.
-            filter.details = {
-                $elemMatch: {
-                    date: { $gte: startDate, $lte: endDate }
-                }
-            };
-            
+        // Details element match filter (city and date)
+        const detailsMatch = {};
+
+        if (location && location !== "All") {
+            detailsMatch.city = location;
         }
 
-        if (category !== 'All') {
-            // filter.category = { $in: ['movies', 'concerts', 'sports', 'comedy', 'workshops'] }
-            filter.category = { $eq: category }
-        }
-        if (location !== "All") {
-            // filter.details.city = {$eq:location}
-            filter['details.city'] = location;
-        }
+        if (date && date.trim() !== "") {
+            const parsedDate = DateTime.fromFormat(date, "dd-MM-yyyy");
+            const dt = parsedDate.isValid ? parsedDate : DateTime.fromISO(date);
 
-        if (search != "") {
-
-            //regex search - for name, category, city, venue, artist, 
-            filter = {
-                $or:[
-                    {"name" : {$regex : search, $options : 'i'}},
-                    {"category":  {$regex : search, $options : 'i'}},
-                    {"details.venue":  {$regex : search, $options : 'i'}},
-                    {"artists": {$regex : search, $options : 'i'}},
-                ]
+            if (dt.isValid) {
+                detailsMatch.date = {
+                    $gte: dt.startOf('day').toJSDate(),
+                    $lte: dt.endOf('day').toJSDate()
+                };
             }
+        } else {
+            // Default: only return shows starting from today onwards
+            detailsMatch.date = {
+                $gte: DateTime.now().startOf('day').toJSDate()
+            };
         }
-        console.log("filter-", filter)
+
+        if (Object.keys(detailsMatch).length > 0) {
+            filter.details = { $elemMatch: detailsMatch };
+        }
+
+        // Search filter (name, category, venue, artist) merged with existing filter
+        if (search && search.trim() !== "") {
+            filter.$or = [
+                { name: { $regex: search.trim(), $options: 'i' } },
+                { category: { $regex: search.trim(), $options: 'i' } },
+                { "details.venue": { $regex: search.trim(), $options: 'i' } },
+                { artists: { $regex: search.trim(), $options: 'i' } },
+            ];
+        }
+
         const eventData = await eventModal.aggregate([
             {
                 $match: filter
@@ -78,15 +67,16 @@ export const getEventList = async (req, res) => {
                     passTypes: 1,
                     img: 1,
                     artists: 1,
-                    desp: 1
+                    desp: 1,
+                    hype: 1
                 }
             }
-        ])
+        ]);
 
-        res.status(200).json(eventData)
+        return res.status(200).json({ success: true, data: eventData });
+
+    } catch (err) {
+        console.error("Error in getEventList:", err);
+        return res.status(500).json({ success: false, msg: "Internal server error" });
     }
-    catch (err) {
-        console.log('err-', err)
-        res.status(500).json({ success: true, msg: "Internal server error" })
-    }
-}
+};
