@@ -60,7 +60,9 @@ export const signinController = async (req, res) => {
             user: {
                 id: holder._id,
                 name: holder.name,
-                role
+                role,
+                img: holder.img || holder.profilePic || '',
+                profilePic: holder.profilePic || holder.img || ''
             },
             msg: "User logged in successfully"
         });

@@ -53,7 +53,8 @@ export const addEvent = async (req, res) => {
             passTypes,
             img,
             artists,
-            desp
+            desp,
+            creatorId: req.user?.id
         };
 
         // Create the event in MongoDB first to get the generated event._id

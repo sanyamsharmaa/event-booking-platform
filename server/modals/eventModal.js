@@ -1,45 +1,55 @@
 import mongoose from "mongoose";
 
 const schema = new mongoose.Schema({
-    name:{
-        type:String,
-        required:true
-    },
-    category:{
+    name: {
         type: String,
-        required:true
+        required: true,
+        trim: true,
+        index: true
+    },
+    category: {
+        type: String,
+        required: true,
+        index: true
     },
     details: [{
-        city : String,  //array of objects each object has detail of city, date and venue 
-        date :Date,
-        venue: String,
+        city: { type: String, required: true },
+        date: { type: Date, required: true },
+        venue: { type: String, required: true },
     }],
-    passTypes:[{
-        tier: String, //object that having keys as type and value for price
-        price : Number,
-        tktCount:Number
+    passTypes: [{
+        tier: { type: String, required: true },
+        price: { type: Number, required: true },
+        tktCount: { type: Number, required: true }
     }],
-    img:{
-        type:String,
-        required:true
-    },
-    artists:{
-        type : [String],
-        required:true
-    },
-    desp:{
+    img: {
         type: String,
-        required:true
+        required: true
     },
-    hype:{
-        type:Number,
-        default:0
+    artists: {
+        type: [String],
+        required: true,
+        index: true
+    },
+    desp: {
+        type: String,
+        required: true
+    },
+    hype: {
+        type: Number,
+        default: 0,
+        index: true
+    },
+    creatorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'artist',
+        index: true
     }
-},
-    {
-        timestamps:true
-    })
+}, {
+    timestamps: true
+});
 
+schema.index({ "details.city": 1, "details.date": 1 });
 
-const eventModal = mongoose.model('event', schema)
-export {eventModal}
+const eventModal = mongoose.model('event', schema);
+export { eventModal };

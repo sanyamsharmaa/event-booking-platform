@@ -1,28 +1,38 @@
 import { createClient } from 'redis';
+import 'dotenv/config';
 
-
-export const redis = createClient({
-    username: 'default',
-    password: 'NI8SBuzF4tuzpakc7dVWlcnONcbTeo2x',
+const redisConfig = {
+    username: process.env.REDIS_USERNAME || 'default',
+    password: process.env.REDIS_PASSWORD || '',
     socket: {
-        host: 'redis-18366.c61.us-east-1-3.ec2.cloud.redislabs.com',
-        port: 18366
+        host: process.env.REDIS_HOST || 'localhost',
+        port: Number(process.env.REDIS_PORT) || 6379,
+        reconnectStrategy: (retries) => {
+            if (retries > 10) {
+                console.error('Redis max reconnection attempts reached');
+                return new Error('Redis max reconnection retries reached');
+            }
+            return Math.min(retries * 200, 3000);
+        }
     }
-});
+};
 
-export const redisConnect=async()=>{
-    try{
-        redis.on('error', err => console.log('Redis Client Error', err));
-        redis.on('connect', () => console.log('Redis Client Connected'));
-        redis.on('reconnecting', () => console.log('Redis Client Reconnecting'));
-        redis.on('ready', () => console.log('Redis Client Ready'));
-        await redis.connect();
-        // console.log('✅ Redis connected successfully');
+export const redis = createClient(redisConfig);
+
+redis.on('error', err => console.error('Redis Client Error:', err.message || err));
+redis.on('connect', () => console.log('Redis Client Connected'));
+redis.on('ready', () => console.log('Redis Client Ready'));
+
+export const redisConnect = async () => {
+    try {
+        if (!redis.isOpen) {
+            await redis.connect();
+        }
+    } catch (err) {
+        console.error('Redis initial connection failed:', err.message || err);
     }
-    catch(err){
-        console.error('❌ Redis connection failed:', err);
-        throw err;
-    }
-}
+};
+
+
 
 

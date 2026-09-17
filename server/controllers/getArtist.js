@@ -1,96 +1,105 @@
-import mongoose from "mongoose"
-
+import mongoose from "mongoose";
 import { artistModal } from "../modals/artistModal.js";
+import { eventModal } from "../modals/eventModal.js";
 
 export const getArtist = async (req, res) => {
-    try{
-        const artistName = req.body.artistName;
-        if(!artistName){
-            res.status(400).json({success:false,msg:"please give name of artist"});
+    try {
+        const artistName = req.body?.artistName ;
+        // console.log("artistName : ", artistName)
+        if (!artistName) {
+            return res.status(400).json({ success: false, msg: "Please provide the name of the artist" });
         }
-        // const filter = { name : { $regex: artistName, $options: 'i' } };
-        // const artistData = await artistModal.aggregate([
-        //     {
-        //         $match: filter 
-        //     }
-        // ])
- 
- const artistData = await artistModal.aggregate([
-        {
-            $search: {
-                index: "artist-fuzzy-search", // Must match the index name you created
-                text: {
-                    query: artistName,
-                    path: "name",
-                    fuzzy: {
-                        maxEdits: 2,        // Allows up to 2 character differences
-                        prefixLength: 0     // Fuzzy matching starts from first character
-                    }
-                }
-            }
-        },
-        {
-            $addFields: {
-                score: { $meta: "searchScore" }  // Add relevance score
-            }
-        },
-        {
-            $limit: 20  // Limit results (optional)
-        },
-        {
-            $project: {
-                // pass: 0,  // Exclude password from results!
-                name:1
-            }
-        }
-    ]);
+
+        let artistData; 
+
+        // try {
+        //     // Attempt Atlas search if configured
+        //     artistData = await artistModal.find().limit(20);
+        //     artistData = await artistModal.aggregate([
+        //         {
+        //             $search: {
+        //                 index: "artist-fuzzy-search",
+        //                 text: {
+        //                     query: artistName,
+        //                     path: "name",
+        //                     fuzzy: {
+        //                         maxEdits: 2,
+        //                         prefixLength: 0
+        //                     }
+        //                 }
+        //             }
+        //         },
+        //         {
+        //             $addFields: {
+        //                 score: { $meta: "searchScore" }
+        //             }
+        //         },
+        //         {
+        //             $limit: 20
+        //         },
+        //         {
+        //             $project: {
+        //                 pass: 0,
+        //                 mobile: 0,
+        //                 mail: 0
+        //             }
+        //         }
+        //     ]);
+
+        // } catch (searchErr) {
+        //     // Fallback to regex search for standard / local MongoDB
+        //     console.log("searchErr")
+        //     artistData = await artistModal.find(
+        //         { name: { $regex: artistName, $options: 'i' } },
+        //         { pass: 0, mobile: 0, mail: 0 }
+        //     ).limit(20);
+        // }
+
+        artistData = await artistModal.find(
+            { name: { $regex: artistName, $options: 'i' } },
+            { pass: 0, mobile: 0, mail: 0 }
+        ).limit(20);
         
-        return res.status(200).json({success : true, data: artistData})
-    }
-    catch(err){
-        console.log("err-", err)
-        return res.status(500).json({success : false, msg: "Internal Server Error"})
-    }
-}
+        // console.log("artistData : ", artistData)
 
-export const artistProfile = async(req,res) =>{
-    try{
-        const id = req.body.artistId;
-        if(!id){
-        return res.status(400).json({success : false, msg: "artist id is required"})
+        return res.status(200).json({ success: true, data: artistData });
+
+    } catch (err) {
+        console.error("Error in getArtist:", err);
+        return res.status(500).json({ success: false, msg: "Internal Server Error" });
+    }
+};
+
+export const artistProfile = async (req, res) => {
+    try {
+        const id = req.body?.artistId || req.body?.id || req.query?.artistId;
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, msg: "A valid artist id is required" });
         }
 
-        const profile = await artistModal.aggregate([
-            {
-                $match:{
-                    _id : new mongoose.Types.ObjectId(id)
-                }
-            },
-            {
-                $lookup:{
-                    from : "events",
-                    localField : "name",
-                    foreignField: "artists",
-                    as : "events"
-                }
-            },
-            {
-                $project:{
-                    pass:0,
-                    mobile : 0,
-                    mail:0
-                }
-            }
-        ])
-
-        if(!profile){
-        return res.status(400).json({success : false, msg: "No events"})
+        const artist = await artistModal.findById(id, { pass: 0, mobile: 0, mail: 0 });
+        if (!artist) {
+            return res.status(404).json({ success: false, msg: "Artist profile not found" });
         }
-        return res.status(200).json({success : false, data : profile})
 
+        // Find events associated with this artist by creatorId or artist name
+        const events = await eventModal.find({
+            $or: [
+                { creatorId: new mongoose.Types.ObjectId(id) },
+                { artists: { $regex: new RegExp(`^${artist.name}$`, 'i') } }
+            ]
+        }).sort({ createdAt: -1 });
+
+        const profileData = {
+            ...artist.toObject(),
+            events: events || []
+        };
+
+        return res.status(200).json({ success: true, data: profileData });
+
+    } catch (err) {
+        console.error("Error in artistProfile:", err);
+        return res.status(500).json({ success: false, msg: "Internal Server Error" });
     }
-    catch(err){
-        console.log("err-", err)
-        return res.status(500).json({success : false, msg: "Internal Server Error"})
-    }
-}
+};
+

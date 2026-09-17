@@ -1,7 +1,7 @@
 import { bookedEventModal } from "../modals/bookedEventsModal.js";
 import { eventModal } from "../modals/eventModal.js";
 import { userModal } from "../modals/userModal.js";
-import { redis } from '../utils/redis.js';
+import { redis, redisConnect } from '../utils/redis.js';
 import mongoose from "mongoose";
 
 async function bookEvent(req, res) {
@@ -11,17 +11,30 @@ async function bookEvent(req, res) {
         return res.status(400).json({ success: false, msg: "Missing required booking details (uId, eId, passType, tkts, detail)" });
     }
 
-    const lockey = `event:${eId}:tier:${passType}:lock:${uId}`;
+    if (req.user?.role === 'artist') {
+        return res.status(403).json({ success: false, msg: "Artists are not allowed to book tickets. Please use an Attendee account." });
+    }
+
+    const mutexKey = `lock:bookEvent:${eId}:${passType}:${uId}`;
+    const reservationKey = `event:${eId}:tier:${passType}:reservation:${uId}`;
     let lockAcquired = false;
     const session = await mongoose.startSession();
 
+    console.log("uId", uId)
+
     try {
-        // Acquire Redis lock with modern v4/v5 options (NX: only set if not exists, EX: TTL in seconds)
-        const lockResult = await redis.set(lockey, "1", { NX: true, EX: 30 });
-        if (!lockResult) {
-            return res.status(409).json({ success: false, msg: "Another booking is in progress. Please try again." });
+        if (!redis.isOpen) {
+            await redisConnect();
         }
-        lockAcquired = true;
+
+        if (redis.isOpen) {
+            // Acquire short-lived Mutex lock (NX: only set if not exists, EX: 15 seconds)
+            const lockResult = await redis.set(mutexKey, "1", { NX: true, EX: 15 });
+            if (!lockResult) {
+                return res.status(409).json({ success: false, msg: "Another booking is in progress. Please try again." });
+            }
+            lockAcquired = true;
+        }
 
         const user = await userModal.findById(uId);
         if (!user) {
@@ -80,11 +93,13 @@ async function bookEvent(req, res) {
 
         await session.commitTransaction();
 
-        // Update ticket availability in Redis cache if key exists
-        try {
-            await redis.decrBy(`event:${eId}:tier:${passType}:available`, Number(tkts));
-        } catch (redisErr) {
-            console.error("Error updating Redis ticket count cache:", redisErr);
+        // Clear user temporary reservation hold from Redis
+        if (redis.isOpen) {
+            try {
+                await redis.del(reservationKey);
+            } catch (clearErr) {
+                console.warn("Could not clear reservation key:", clearErr.message);
+            }
         }
 
         return res.status(200).json({ success: true, msg: "Your tickets are booked!", booking });
@@ -97,9 +112,13 @@ async function bookEvent(req, res) {
         return res.status(500).json({ success: false, msg: `Internal server error - ${err.message}` });
 
     } finally {
-        // ONLY release the lock if this request was the one that acquired it
-        if (lockAcquired) {
-            await redis.del(lockey);
+        // Release the mutex lock
+        if (lockAcquired && redis.isOpen) {
+            try {
+                await redis.del(mutexKey);
+            } catch (delErr) {
+                console.error("Error releasing Redis mutex lock:", delErr.message);
+            }
         }
         await session.endSession();
     }
@@ -113,7 +132,9 @@ async function myEvents(req, res) {
             return res.status(400).json({ success: false, msg: "User ID is required" });
         }
 
-        const events = await bookedEventModal.find({ userId: uid }).sort({ createdAt: -1 });
+        const events = await bookedEventModal.find({ userId: uid })
+            .populate('eventId')
+            .sort({ createdAt: -1 });
         return res.status(200).json({ success: true, data: events });
 
     } catch (err) {
@@ -122,4 +143,5 @@ async function myEvents(req, res) {
     }
 }
 
-export { bookEvent, myEvents };
+
+export { bookEvent, myEvents };

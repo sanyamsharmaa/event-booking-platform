@@ -17,6 +17,8 @@ export const registerController = async (req, res) => {
             role,
             interestArr,
             headline,
+            img,
+            profilePic
         } = req?.body;
 
         if (!name || !mobile || !mail || !pass || !role) {
@@ -68,18 +70,29 @@ export const registerController = async (req, res) => {
                 return res.status(400).json({ success: false, msg: "Headline is required for artists" });
             }
 
+            const artistPic = img || profilePic || '';
+
             const newArtist = await artistModal.create({
                 name,
                 mobile,
                 mail,
                 pass: encPass,
-                headline
+                headline,
+                img: artistPic,
+                profilePic: artistPic
             });
 
             return res.status(201).json({
                 success: true,
                 msg: "Artist account successfully created!",
-                artist: { id: newArtist._id, name: newArtist.name, mail: newArtist.mail, role: 'artist' }
+                artist: { 
+                    id: newArtist._id, 
+                    name: newArtist.name, 
+                    mail: newArtist.mail, 
+                    role: 'artist',
+                    img: newArtist.img,
+                    profilePic: newArtist.profilePic
+                }
             });
         }
 

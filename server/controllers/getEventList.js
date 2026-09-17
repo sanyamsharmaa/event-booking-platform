@@ -10,6 +10,7 @@ export const getEventList = async (req, res) => {
             search = "",
         } = req.body;
 
+        console.log("search term: ",search)
         const filter = {};
 
         // Category filter
@@ -79,4 +80,4 @@ export const getEventList = async (req, res) => {
         console.error("Error in getEventList:", err);
         return res.status(500).json({ success: false, msg: "Internal server error" });
     }
-};
+};
