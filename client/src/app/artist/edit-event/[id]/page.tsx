@@ -14,7 +14,8 @@ import {
   Check,
   AlertCircle,
   Edit,
-  Flame
+  Flame,
+  MapPin
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -39,6 +40,62 @@ const CATEGORIES = [
   'Sports',
   'Workshops'
 ];
+
+export const PRESET_CITIES = [
+  { city: 'Mumbai', venue: 'MMRDA Grounds, BKC' },
+  { city: 'Delhi', venue: 'Jawaharlal Nehru Stadium' },
+  { city: 'Bengaluru', venue: 'Bengaluru Palace Grounds' },
+  { city: 'Hyderabad', venue: 'Gachibowli Stadium' },
+  { city: 'Ahmedabad', venue: 'Narendra Modi Stadium' },
+  { city: 'Pune', venue: 'Mahalaxmi Lawns, Kharadi' },
+  { city: 'Chennai', venue: 'YMCA Grounds, Nandanam' },
+  { city: 'Kolkata', venue: 'Biswa Bangla Mela Prangan' },
+  { city: 'Jaipur', venue: 'JECC / Jaipur Exhibition & Convention Centre' },
+  { city: 'Lucknow', venue: 'Bharat Ratna Shri Atal Bihari Vajpayee Ekana Stadium' },
+  { city: 'Gurugram', venue: 'Leisure Valley Ground' },
+  { city: 'Chandigarh', venue: 'Sector 34 Ground' },
+  { city: 'Indore', venue: 'Holkar Stadium / large-event grounds' },
+  { city: 'Kochi', venue: 'Jawaharlal Nehru International Stadium' },
+  { city: 'Bhubaneswar', venue: 'Kalinga Stadium / event grounds' },
+];
+
+export const CITY_VENUE_MAP: Record<string, string> = PRESET_CITIES.reduce((acc, curr) => {
+  acc[curr.city] = curr.venue;
+  return acc;
+}, {} as Record<string, string>);
+
+const getTodayISO = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toInputDateFormat = (dmy: string): string => {
+  if (!dmy) return '';
+  if (dmy.includes('-')) {
+    const parts = dmy.split('-');
+    if (parts[0].length === 2 && parts[2]?.length === 4) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    if (parts[0].length === 4) {
+      return dmy;
+    }
+  }
+  return '';
+};
+
+const toDisplayDateFormat = (ymd: string): string => {
+  if (!ymd) return '';
+  if (ymd.includes('-')) {
+    const parts = ymd.split('-');
+    if (parts[0].length === 4) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+  }
+  return ymd;
+};
 
 export default function EditEventPage() {
   const params = useParams();
@@ -100,7 +157,7 @@ export default function EditEventPage() {
               })
             );
           } else {
-            setDetails([{ city: 'Mumbai', date: '25-10-2026', venue: 'Jio World Centre' }]);
+            setDetails([{ city: 'Mumbai', date: toDisplayDateFormat(getTodayISO()), venue: 'MMRDA Grounds, BKC' }]);
           }
 
           if (current.passTypes && current.passTypes.length > 0) {
@@ -132,7 +189,17 @@ export default function EditEventPage() {
 
   // Show Details handlers
   const addDetailRow = () => {
-    setDetails([...details, { city: 'Bengaluru', date: '30-10-2026', venue: 'Convention Hall' }]);
+    const existingCities = new Set(details.map((d) => d.city));
+    const nextCityObj = PRESET_CITIES.find((c) => !existingCities.has(c.city)) || PRESET_CITIES[2];
+
+    setDetails([
+      ...details,
+      {
+        city: nextCityObj.city,
+        date: toDisplayDateFormat(getTodayISO()),
+        venue: nextCityObj.venue,
+      },
+    ]);
   };
 
   const removeDetailRow = (index: number) => {
@@ -141,9 +208,24 @@ export default function EditEventPage() {
     }
   };
 
-  const updateDetail = (index: number, field: keyof DetailRow, value: string) => {
+  const handleCityChange = (index: number, newCity: string) => {
     const updated = [...details];
-    updated[index][field] = value;
+    updated[index].city = newCity;
+    if (CITY_VENUE_MAP[newCity]) {
+      updated[index].venue = CITY_VENUE_MAP[newCity];
+    }
+    setDetails(updated);
+  };
+
+  const handleDateChange = (index: number, isoDate: string) => {
+    const updated = [...details];
+    updated[index].date = toDisplayDateFormat(isoDate);
+    setDetails(updated);
+  };
+
+  const handleVenueChange = (index: number, newVenue: string) => {
+    const updated = [...details];
+    updated[index].venue = newVenue;
     setDetails(updated);
   };
 
@@ -343,52 +425,118 @@ export default function EditEventPage() {
             </button>
           </div>
 
+          {/* Column Header Labels */}
+          <div className="hidden sm:grid sm:grid-cols-12 gap-3 px-3.5 text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+            <div className="sm:col-span-4 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+              <span>City Hub</span>
+            </div>
+            <div className="sm:col-span-3 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-fuchsia-400" />
+              <span>Show Date</span>
+            </div>
+            <div className="sm:col-span-4 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Venue (Editable)</span>
+            </div>
+            <div className="sm:col-span-1 text-center">
+              <span>Action</span>
+            </div>
+          </div>
+
           <div className="space-y-3">
-            {details.map((detail, index) => (
-              <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 items-center">
-                <div className="sm:col-span-4">
-                  <input
-                    type="text"
-                    required
-                    placeholder="City (e.g. Mumbai)"
-                    value={detail.city}
-                    onChange={(e) => updateDetail(index, 'city', e.target.value)}
-                    className="w-full bg-transparent border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                  />
+            {details.map((detail, index) => {
+              const isPreset = PRESET_CITIES.some((c) => c.city === detail.city);
+
+              return (
+                <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 items-center hover:border-fuchsia-500/30 transition-all">
+                  
+                  {/* City Selector */}
+                  <div className="sm:col-span-4 space-y-1">
+                    <label className="sm:hidden text-[10px] uppercase font-bold text-zinc-400">City</label>
+                    <div className="flex flex-col gap-1.5">
+                      <select
+                        value={isPreset ? detail.city : 'Other'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'Other') {
+                            handleCityChange(index, '');
+                          } else {
+                            handleCityChange(index, val);
+                          }
+                        }}
+                        className="w-full bg-zinc-900/90 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+                      >
+                        {PRESET_CITIES.map((c) => (
+                          <option key={c.city} value={c.city} className="bg-zinc-900 text-white">
+                            {c.city}
+                          </option>
+                        ))}
+                        <option value="Other" className="bg-zinc-900 text-fuchsia-400">
+                          + Other / Custom City
+                        </option>
+                      </select>
+
+                      {!isPreset && (
+                        <input
+                          type="text"
+                          required
+                          placeholder="Type custom city name..."
+                          value={detail.city}
+                          onChange={(e) => handleCityChange(index, e.target.value)}
+                          className="w-full bg-white/5 border border-purple-500/40 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Future Date Selector with Mini Calendar */}
+                  <div className="sm:col-span-3 space-y-1">
+                    <label className="sm:hidden text-[10px] uppercase font-bold text-zinc-400">Show Date</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        required
+                        min={getTodayISO()}
+                        value={toInputDateFormat(detail.date)}
+                        onChange={(e) => handleDateChange(index, e.target.value)}
+                        className="w-full bg-zinc-900/90 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-fuchsia-500 cursor-pointer [color-scheme:dark]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Venue (Auto-suggested & Editable) */}
+                  <div className="sm:col-span-4 space-y-1">
+                    <label className="sm:hidden text-[10px] uppercase font-bold text-zinc-400">Venue (Editable)</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. MMRDA Grounds, BKC"
+                      value={detail.venue}
+                      onChange={(e) => handleVenueChange(index, e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Delete Button */}
+                  <div className="sm:col-span-1 flex justify-center pt-2 sm:pt-0">
+                    {details.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => removeDetailRow(index)}
+                        className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 border border-transparent hover:border-rose-500/30 transition-all"
+                        title="Remove this tour date"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-zinc-600 font-bold">1 min</span>
+                    )}
+                  </div>
+
                 </div>
-                <div className="sm:col-span-3">
-                  <input
-                    type="text"
-                    required
-                    placeholder="DD-MM-YYYY"
-                    value={detail.date}
-                    onChange={(e) => updateDetail(index, 'date', e.target.value)}
-                    className="w-full bg-transparent border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono"
-                  />
-                </div>
-                <div className="sm:col-span-4">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Venue / Stadium Name"
-                    value={detail.venue}
-                    onChange={(e) => updateDetail(index, 'venue', e.target.value)}
-                    className="w-full bg-transparent border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div className="sm:col-span-1 flex justify-center">
-                  {details.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeDetailRow(index)}
-                      className="p-1.5 text-zinc-400 hover:text-rose-400 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
