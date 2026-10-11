@@ -20,7 +20,7 @@ async function bookEvent(req, res) {
     let lockAcquired = false;
     const session = await mongoose.startSession();
 
-    console.log("uId", uId)
+    // console.log("uId", uId)
 
     try {
         if (!redis.isOpen) {

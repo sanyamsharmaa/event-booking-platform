@@ -50,8 +50,8 @@ export default function EventDetailPage() {
       try {
         const allEvents = await fetchEvents({});
         const currentEvent = allEvents.find((e) => e._id === eventId);
-        console.log("Eventid-", eventId)
-        console.log("allevents-", allEvents)
+        // console.log("Eventid-", eventId)
+        // console.log("allevents-", allEvents)
         if (currentEvent) {
           setEvent(currentEvent);
           if (currentEvent.details && currentEvent.details.length > 0) {
@@ -73,7 +73,7 @@ export default function EventDetailPage() {
     }
   }, [eventId]);
 
-  console.log("user, token, isAuthenticated", user, token, isAuthenticated)
+  // console.log("user, token, isAuthenticated", user, token, isAuthenticated)
   const handleBooking = async () => {
     if (!isAuthenticated || !token || !user) {
       router.push(`/signin?redirect=/events/${eventId}`);
@@ -109,7 +109,7 @@ export default function EventDetailPage() {
         token
       );
 
-      console.log("Order res-", orderRes.success)
+      // console.log("Order res-", orderRes.success)
       if (!orderRes.success || !orderRes.order) {
         setErrorMsg(orderRes.msg || 'Unable to reserve tickets. They may be sold out.');
         setBookingInProgress(false);

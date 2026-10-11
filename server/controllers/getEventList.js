@@ -10,7 +10,7 @@ export const getEventList = async (req, res) => {
             search = "",
         } = req.body;
 
-        console.log("search term: ",search)
+        // console.log("search term: ",search)
         const filter = {};
 
         // Category filter

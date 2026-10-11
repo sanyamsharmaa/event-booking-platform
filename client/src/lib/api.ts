@@ -13,7 +13,7 @@ async function fetcher<T>(endpoint: string, options: RequestInit = {}): Promise<
       ...options,
       headers,
     });
-    console.log("response-", res)
+    // console.log("response-", res)
     const data = await res.json();
     return data;
   } catch (err: any) {
