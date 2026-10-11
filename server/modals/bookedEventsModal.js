@@ -1,29 +1,28 @@
 import mongoose from "mongoose";
 
-
 const schema = new mongoose.Schema({
-    userId: { // userid
-        type: mongoose.Types.ObjectId,
-        required: true
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'user',
+        required: true,
+        index: true
     },
     eventId: {
-        type: mongoose.Types.ObjectId,
-        required: true
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'event',
+        required: true,
+        index: true
     },
     passType: {
         type: String,
         required: true
     },
-    // Category:{
-    //     type: String,
-    //     required:true
-    // },
     date: {
         type: Date,
         required: true
     },
     location: {
-        type: String,  // combined string of city and venue
+        type: String,
         required: true
     },
     tktCount: {
@@ -32,9 +31,8 @@ const schema = new mongoose.Schema({
     }
 }, {
     timestamps: true    
-})
+});
 
+const bookedEventModal = mongoose.model('bookedEvent', schema);
 
-
-const bookedEventModal = mongoose.model('bookedEvent', schema)
-export { bookedEventModal }
+export { bookedEventModal };

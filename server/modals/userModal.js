@@ -1,31 +1,39 @@
-import mongoose from "mongoose"
+import mongoose from "mongoose";
 
 const user = new mongoose.Schema({
-    name:{
-        type : String,
-        required :true
+    name: {
+        type: String,
+        required: true,
+        trim: true
     },
-    mail:{
-        type : String,
-        required :true
+    mail: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true,
+        lowercase: true,
+        trim: true
     },
-    mobile:{
-        type : String,
-        required :true
+    mobile: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true,
+        trim: true
     },
-    pass:{
-        type : String,
-        required :true
+    pass: {
+        type: String,
+        required: true
     },
-    interest:{
-        type :Array,
-        required:true
+    interest: {
+        type: [String],
+        required: true,
+        default: []
     }
-},{
-    timestamps:true  
-})
+}, {
+    timestamps: true
+});
 
+const userModal = mongoose.model('user', user);
 
-const userModal = mongoose.model('user',user )
-
-export {userModal}
+export { userModal };

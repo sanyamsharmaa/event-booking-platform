@@ -1,24 +1,41 @@
 import { bookedEventModal } from "../modals/bookedEventsModal.js";
 import { eventModal } from "../modals/eventModal.js";
 import { userModal } from "../modals/userModal.js";
-import { DateTime } from 'luxon';
-import { redis } from '../utils/redis.js'
-
+import { redis, redisConnect } from '../utils/redis.js';
+import mongoose from "mongoose";
 
 async function bookEvent(req, res) {
+    const { uId, eId, passType, tkts, detail } = req.body || {};
+
+    if (!uId || !eId || !passType || !tkts || !detail || !detail.date || !detail.venue || !detail.city) {
+        return res.status(400).json({ success: false, msg: "Missing required booking details (uId, eId, passType, tkts, detail)" });
+    }
+
+    if (req.user?.role === 'artist') {
+        return res.status(403).json({ success: false, msg: "Artists are not allowed to book tickets. Please use an Attendee account." });
+    }
+
+    const mutexKey = `lock:bookEvent:${eId}:${passType}:${uId}`;
+    const reservationKey = `event:${eId}:tier:${passType}:reservation:${uId}`;
+    let lockAcquired = false;
     const session = await mongoose.startSession();
-    const lockey = `event:${req.body.eId}:tier:${req.body.passType}:lock:${req.body.uId}`;
+
+    // console.log("uId", uId)
 
     try {
-        const { uId, eId, passType, tkts, detail } = req.body;
-
-        // ✅ FIX 5: Acquire Redis lock BEFORE doing anything (NX = only set if not exists, EX = TTL in seconds)
-        const lockAcquired = await redis.set(lockey, "1", "NX", "EX", 30);
-        if (!lockAcquired) {
-            return res.status(409).json({ success: false, msg: "Another booking is in progress. Please try again." });
+        if (!redis.isOpen) {
+            await redisConnect();
         }
 
-        // ✅ FIX 1: return after every early-exit response
+        if (redis.isOpen) {
+            // Acquire short-lived Mutex lock (NX: only set if not exists, EX: 15 seconds)
+            const lockResult = await redis.set(mutexKey, "1", { NX: true, EX: 15 });
+            if (!lockResult) {
+                return res.status(409).json({ success: false, msg: "Another booking is in progress. Please try again." });
+            }
+            lockAcquired = true;
+        }
+
         const user = await userModal.findById(uId);
         if (!user) {
             return res.status(400).json({ success: false, msg: "User not found" });
@@ -29,13 +46,13 @@ async function bookEvent(req, res) {
             return res.status(400).json({ success: false, msg: "Event not found" });
         }
 
-        // ✅ FIX 2 & 3: Correct date comparison using plain Date (no await on DateTime.now())
+        // Date comparison
         const now = new Date();
         if (new Date(detail.date) < now) {
             return res.status(400).json({ success: false, msg: "Event has already ended" });
         }
 
-        // ✅ FIX 4: Single $elemMatch combining both conditions
+        // Check if enough tickets are available for the requested pass type
         const show = await eventModal.aggregate([
             {
                 $match: {
@@ -43,14 +60,13 @@ async function bookEvent(req, res) {
                     passTypes: {
                         $elemMatch: {
                             tier: passType,
-                            tktCount: { $gte: tkts },
+                            tktCount: { $gte: Number(tkts) },
                         },
                     },
                 },
             },
         ]);
 
-        // ✅ FIX 7: aggregate returns array, check .length not truthiness
         if (show.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -58,30 +74,37 @@ async function bookEvent(req, res) {
             });
         }
 
-        // ✅ FIX 6: Start transaction — session abort handled in catch/finally
         session.startTransaction();
 
-        await bookedEventModal.create([{
+        const [booking] = await bookedEventModal.create([{
             userId: uId,
             eventId: eId,
             passType: passType,
-            date: detail.date,
+            date: new Date(detail.date),
             location: `${detail.venue}, ${detail.city}`,
-            tktCount: tkts,
+            tktCount: Number(tkts),
         }], { session });
 
         await eventModal.updateOne(
             { _id: eId, "passTypes.tier": passType },
-            { $inc: { "passTypes.$.tktCount": -tkts } },
+            { $inc: { "passTypes.$.tktCount": -Number(tkts) } },
             { session }
         );
 
         await session.commitTransaction();
 
-        return res.status(200).json({ success: true, msg: "Your tickets are booked!" });
+        // Clear user temporary reservation hold from Redis
+        if (redis.isOpen) {
+            try {
+                await redis.del(reservationKey);
+            } catch (clearErr) {
+                console.warn("Could not clear reservation key:", clearErr.message);
+            }
+        }
+
+        return res.status(200).json({ success: true, msg: "Your tickets are booked!", booking });
 
     } catch (err) {
-        // ✅ FIX 6: Abort transaction on any failure
         if (session.inTransaction()) {
             await session.abortTransaction();
         }
@@ -89,29 +112,36 @@ async function bookEvent(req, res) {
         return res.status(500).json({ success: false, msg: `Internal server error - ${err.message}` });
 
     } finally {
-        // ✅ FIX 5 + 6: Always release Redis lock and end session, success or failure
-        await redis.del(lockey);
+        // Release the mutex lock
+        if (lockAcquired && redis.isOpen) {
+            try {
+                await redis.del(mutexKey);
+            } catch (delErr) {
+                console.error("Error releasing Redis mutex lock:", delErr.message);
+            }
+        }
         await session.endSession();
     }
 }
 
-async function myEvents(req,res){
-    try{
-        const {
-            uid 
-        } = req.body
+async function myEvents(req, res) {
+    try {
+        const uid = req.user?.id || req.body?.uid;
 
-        if(!uid){
-            res.status(400).json({ success: false, msg: "user id is  missing" });
+        if (!uid) {
+            return res.status(400).json({ success: false, msg: "User ID is required" });
         }
-        
-        const events = await bookedEventModal.find({userId:uid});
-        res.status(200).json({ success: true, data : events});
-        
-    }
-    catch(err){
-        res.status(500).json({ success: false, msg: `Internal server error - ${err}` });
+
+        const events = await bookedEventModal.find({ userId: uid })
+            .populate('eventId')
+            .sort({ createdAt: -1 });
+        return res.status(200).json({ success: true, data: events });
+
+    } catch (err) {
+        console.error("myEvents error:", err);
+        return res.status(500).json({ success: false, msg: `Internal server error - ${err.message}` });
     }
 }
 
-export  {bookEvent, myEvents};
+
+export { bookEvent, myEvents };
